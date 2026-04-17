@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecuRoutine Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="authScreen" class="auth-wrapper">
+    <div class="card auth-card">
+      <h1>SecuRoutine</h1>
+      <p class="muted">Streak based security routine prototype</p>
+
+      <div class="tabs">
+        <button id="loginTab" class="tab active">Login</button>
+        <button id="registerTab" class="tab">Register</button>
+      </div>
+
+      <div id="loginForm">
+        <input id="loginEmail" type="email" placeholder="Email" value="demo@securoutine.com" />
+        <input id="loginPassword" type="password" placeholder="Password" value="123456" />
+        <button class="primary" onclick="login()">Login</button>
+      </div>
+
+      <div id="registerForm" class="hidden">
+        <input id="registerName" type="text" placeholder="Display name" />
+        <input id="registerEmail" type="email" placeholder="Email" />
+        <select id="registerAge">
+          <option value="">Select age group</option>
+          <option>Younger User</option>
+          <option>Adult User</option>
+          <option>Older User</option>
+        </select>
+        <input id="registerPassword" type="password" placeholder="Password" />
+        <button class="primary" onclick="register()">Create Account</button>
+      </div>
+
+      <p id="authMessage" class="success hidden"></p>
+    </div>
+  </div>
+
+  <div id="dashboard" class="app hidden">
+    <div class="card topbar">
+      <div>
+        <h2>Welcome back, <span id="userName">User</span></h2>
+        <p class="muted">Complete daily security tasks to keep your streak active</p>
+      </div>
+      <div>
+        <button class="ghost" onclick="resetTasks()">Reset Demo Tasks</button>
+        <button class="secondary" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        Current Streak
+        <strong id="streakValue">0</strong>
+      </div>
+      <div class="stat-box">
+        Total Points
+        <strong id="pointsValue">0</strong>
+      </div>
+      <div class="stat-box">
+        Level
+        <strong id="levelValue">1</strong>
+      </div>
+      <div class="stat-box">
+        Tasks Completed Today
+        <strong id="completedValue">0</strong>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div>
+        <div class="card">
+          <h3>Daily Security Tasks</h3>
+          <p class="muted">Prototype version with simulated task completion</p>
+          <div id="taskList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Recent Activity</h3>
+          <ul id="activityList" class="activity-list"></ul>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3>Reward Progress</h3>
+          <ul id="rewardList" class="reward-list"></ul>
+        </div>
+
+        <div class="card">
+          <h3>Reminder Settings</h3>
+          <div class="settings-row">
+            <span>Enable reminders</span>
+            <input id="reminderEnabled" class="switch" type="checkbox" checked onchange="saveSettings()" />
+          </div>
+          <div class="settings-row">
+            <span>Adaptive prompts</span>
+            <input id="adaptivePrompt" class="switch" type="checkbox" checked onchange="saveSettings()" />
+          </div>
+          <div style="margin-top: 12px;">
+            <label class="muted">Reminder frequency</label>
+            <select id="reminderFrequency" onchange="saveSettings()">
+              <option>Daily</option>
+              <option>Every 2 days</option>
+              <option>Weekly</option>
+            </select>
+          </div>
+          <p id="settingsMessage" class="success hidden">Settings saved</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
