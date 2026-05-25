@@ -1,6 +1,17 @@
-#SecuRoutine 
+# SecuRoutine
+Streak-based cybersecurity application.
 
-KPU INFO 4290 Group Project
-James Viola
-Gia Hoang
-Harris Waheed
+## Technologies Used
+- HTML
+- CSS
+- JavaScript
+- Firebase Firestore
+
+## Team Members
+- James Viola
+- Gia Hoang
+- Harris Waheed
+
+## Project Status
+Current prototype developed for INFO 4290.
+Future implementation may migrate to React and Flutter.
