@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "994435974311",
+    "project_id": "securoutine",
+    "storage_bucket": "securoutine.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:994435974311:android:c01e79837ae094ee050782",
+        "android_client_info": {
+          "package_name": "com.example.flutter_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "994435974311-cudpf01bg0ovip3dvivi43bapmn1l7mo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrLLt9CtJQArA_owICD9cru18L97pN0a0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "994435974311-cudpf01bg0ovip3dvivi43bapmn1l7mo.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
