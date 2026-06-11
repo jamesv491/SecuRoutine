@@ -2,7 +2,7 @@
 **Team:** James Viola · Gia Hoang · Harris Waheed 
 **Course:** INFO 4290 — Group 2
 
-SecuRoutine is a streak-based cybersecurity habit tracker built with **Flutter** (frontend) and **Firebase** (Authentication + Firestore). This guide walks every team member through setting up the development environment from scratch so the app runs locally.
+SecuRoutine was originally built as a prototype using HTML, CSS and JavaScript. The project has since migrated to **Flutter** and **Firebase** so that it aligns with the mobile application goal described in the INFO 4190 design report. The old prototype files have been removed from the frontend folder, and this README documents how to set up and run the new Flutter and Firebase version of the project.
 
 > **Note:** GitHub only stores our source code. Tools (Flutter SDK, Firebase CLI), generated build files, and dependency packages are **not** in the repo — each member must install them locally by following the steps below.
 
