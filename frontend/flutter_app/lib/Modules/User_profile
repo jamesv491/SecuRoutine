@@ -1,1 +1,60 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+
+// enum for accessibility preferences of user
+// accessibility enum accessed by AccessibilityPreference.name
+enum accessibility {
+    none,
+    largerText,
+    highContrast,
+}
+
+// Stores userprofile data
+class UserProfile {
+    final String profileId;
+    final String userId;
+    String displayName;
+    String? ageGroup;
+    int Streak;
+    int totalPoints;
+    int level;
+    final accessibility? accessibility;
+
+    const UserProfile({
+        required this.profileId,
+        required this.userId,
+        this.displayName = '',
+        this.ageGroup,
+        this.Streak = 0,
+        this.totalPoints = 0,
+        this.level = 1,
+        this.accessibility,
+    });
+
+    factory UserProfile.fromMap(Map<String, dynamic> map, String id) {
+        return UserProfile(
+            profileId: id,
+            userId: map['userId'] ?? '',
+            displayName: map['displayName'] ?? '',
+            ageGroup: map['ageGroup'],
+            Streak: map['Streak'] ?? 0,
+            totalPoints: map['totalPoints'] ?? 0,
+            level: map['level'] ?? 1,
+            accessibility: map['accessibility'] != null ? AccessibilityPreference.values.firstWhere(
+                (e) => e.name == map['accessibility'],
+            )
+            : null,
+        );
+    }
+
+    Map<String, dynamic> toMap() => {
+            'userId' : userId,
+            'displayName' : displayName,
+            'ageGroup' : ageGroup,
+            'Streak' : Streak,
+            'totalPoints' : totalPoints,
+            'level' : level,
+            'accessibility' : accessibility?.name,
+    };
+}
+
