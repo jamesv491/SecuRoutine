@@ -1,5 +1,7 @@
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/task_pool.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -41,7 +43,8 @@ class AuthService {
       'current_level': 1,
       'created_at': FieldValue.serverTimestamp(),
 
-      // Streak/task tracking fields
+      // last_active_date left null on purpose — it should only be set
+      // the first time a task is actually completed, not at account creation
       'last_active_date': null,
       'today_tasks': [],
       'last_task_generation_date': today,
@@ -61,7 +64,7 @@ class AuthService {
     if (!data.containsKey('today_tasks')) {
       final today = DateTime.now().toIso8601String().substring(0, 10);
       final patch = {
-        'last_active_date': today,
+        'last_active_date': null,
         'today_tasks': [],
         'last_task_generation_date': today,
       };
@@ -171,24 +174,51 @@ class AuthService {
     });
   }
 
-  // Temporary helper to seed demo tasks when today_tasks is empty.
-  // This exists only until real task generation (filtered by
-  // security_preference) is implemented. Once that logic exists,
-  // this function can be removed and replaced with generateNewTaskSet().
-  Future<void> seedTasksIfEmpty(List<Map<String, dynamic>> defaultTasks) async {
+  // Generates a new set of daily tasks from the local task pool.
+  // Guarantees at least one task matches the user's security_preference,
+  // the rest are picked at random from the remaining pool to avoid a
+  // repeated experience, per the original design report.
+  Future<void> generateNewTaskSet({int setSize = 3}) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
     final snap = await docRef.get();
     final data = snap.data();
     if (data == null) return;
 
-    final List existing = data['today_tasks'] ?? [];
-    if (existing.isNotEmpty) return;
+    final preference = data['security_preference'] as String?;
+    final random = Random();
 
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final matching =
+        taskPool.where((t) => t['category'] == preference).toList()
+          ..shuffle(random);
+    final others =
+        taskPool.where((t) => t['category'] != preference).toList()
+          ..shuffle(random);
+
+    final selected = <Map<String, dynamic>>[];
+
+    // At least one task always matches the user's stated preference
+    if (matching.isNotEmpty) {
+      selected.add(matching.first);
+    }
+
+    for (final t in others) {
+      if (selected.length >= setSize) break;
+      selected.add(t);
+    }
+
+    // Fallback in case the pool doesn't have enough tasks to fill setSize
+    while (selected.length < setSize && selected.length < taskPool.length) {
+      final candidate = taskPool[random.nextInt(taskPool.length)];
+      if (!selected.any((t) => t['id'] == candidate['id'])) {
+        selected.add(candidate);
+      }
+    }
+
     await docRef.update({
-      'today_tasks':
-          defaultTasks.map((t) => {...t, 'status': 'pending'}).toList(),
+      'today_tasks': selected.map((t) => {...t, 'status': 'pending'}).toList(),
       'last_task_generation_date': today,
     });
   }
