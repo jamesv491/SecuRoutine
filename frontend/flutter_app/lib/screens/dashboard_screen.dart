@@ -20,46 +20,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color skipBtn = Color(0xFF9C8C6E);
   static const Color glitchRed = Color(0xFFFF5A5A);
 
-  // Fallback tasks used only to seed Firestore the first time a user
-  // has no tasks yet. Replace this with real preference-based generation
-  // once that logic is implemented.
-  static const List<Map<String, dynamic>> _defaultTasks = [
-    {
-      'id': 't1',
-      'name': 'Review recent login activity',
-      'description': 'Check whether recent sign in activity looks normal.',
-      'points': 13,
-    },
-    {
-      'id': 't2',
-      'name': 'Review privacy settings',
-      'description': 'Check privacy permissions on your main account.',
-      'points': 10,
-    },
-    {
-      'id': 't3',
-      'name': 'Change an old password',
-      'description': 'Update one password that has not been changed recently.',
-      'points': 10,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _loadProfile();
   }
 
-  // Loads the profile from Firestore. Seeds demo tasks first if none exist,
-  // so the Complete/Skip buttons always have real data to act on.
+  // Loads the profile from Firestore. Checks/resets streak first, then
+  // generates a task set from the pool if today_tasks is empty, so the
+  // Complete/Skip buttons always have real data to act on.
   Future<void> _loadProfile() async {
     setState(() => _loading = true);
 
-    await _authService.seedTasksIfEmpty(_defaultTasks);
+    await _authService.checkAndUpdateStreak();
 
     final data = await _authService.getProfile();
+    final List existingTasks = data?['today_tasks'] ?? [];
+    if (existingTasks.isEmpty) {
+      await _authService.generateNewTaskSet();
+    }
+
+    final refreshed = await _authService.getProfile();
     setState(() {
-      _profile = data;
+      _profile = refreshed;
       _loading = false;
     });
   }
@@ -74,6 +57,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Marks a task as skipped and refreshes the dashboard state
   Future<void> _skipTask(Map<String, dynamic> task) async {
     await _authService.skipTask(task['id'] as String);
+    await _loadProfile();
+  }
+
+  // Requests a brand new task set from the pool, replacing today_tasks
+  Future<void> _newSet() async {
+    await _authService.generateNewTaskSet();
     await _loadProfile();
   }
 
@@ -252,8 +241,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _tasksHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: const [
-        Text(
+      children: [
+        const Text(
           "Today's Tasks",
           style: TextStyle(
             fontSize: 22,
@@ -261,13 +250,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: Colors.black,
           ),
         ),
-        // "New Set" button will be wired to generateNewTaskSet() in a later step
-        Text(
-          'New Set',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: Colors.black87,
+        // Wired to generateNewTaskSet() via _newSet
+        GestureDetector(
+          onTap: _newSet,
+          child: const Text(
+            'New Set',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
           ),
         ),
       ],
