@@ -48,6 +48,7 @@ class AuthService {
     });
   }
 
+  // Read the profile from Firestore, backfilling new fields if missing
   Future<Map<String, dynamic>?> getProfile() async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -71,7 +72,8 @@ class AuthService {
     return data;
   }
 
-  // Complete a task: update status, add points, recalc level
+  // Complete a task: mark it completed, add points, recalculate level.
+  // Uses a transaction so concurrent writes don't corrupt the task list.
   Future<void> completeTask(String taskId, int points) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -85,11 +87,12 @@ class AuthService {
       final idx = tasks.indexWhere((t) => t['id'] == taskId);
       if (idx == -1 || tasks[idx]['status'] != 'pending') return;
 
+      // Copy the map so we don't mutate a read-only structure from Firestore
       tasks[idx] = Map<String, dynamic>.from(tasks[idx]);
       tasks[idx]['status'] = 'completed';
 
       final newPoints = (data['total_points'] ?? 0) + points;
-      final newLevel = (newPoints ~/ 100) + 1;
+      final newLevel = (newPoints ~/ 100) + 1; // 100 points per level
 
       tx.update(docRef, {
         'today_tasks': tasks,
@@ -99,7 +102,7 @@ class AuthService {
     });
   }
 
-  // Skip a task: update status only, no points
+  // Skip a task: mark it skipped, no points awarded.
   Future<void> skipTask(String taskId) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -117,6 +120,28 @@ class AuthService {
       tasks[idx]['status'] = 'skipped';
 
       tx.update(docRef, {'today_tasks': tasks});
+    });
+  }
+
+  // Temporary helper to seed demo tasks when today_tasks is empty.
+  // This exists only until real task generation (filtered by
+  // security_preference) is implemented. Once that logic exists,
+  // this function can be removed and replaced with generateNewTaskSet().
+  Future<void> seedTasksIfEmpty(List<Map<String, dynamic>> defaultTasks) async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+    final snap = await docRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final List existing = data['today_tasks'] ?? [];
+    if (existing.isNotEmpty) return;
+
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await docRef.update({
+      'today_tasks':
+          defaultTasks.map((t) => {...t, 'status': 'pending'}).toList(),
+      'last_task_generation_date': today,
     });
   }
 

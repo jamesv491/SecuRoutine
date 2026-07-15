@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'login_screen.dart'; 
+import 'login_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -20,22 +20,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color skipBtn = Color(0xFF9C8C6E);
   static const Color glitchRed = Color(0xFFFF5A5A);
 
-  // Task demo data (no Firestore task collection yet)
-  static const List<Map<String, dynamic>> _tasks = [
+  // Fallback tasks used only to seed Firestore the first time a user
+  // has no tasks yet. Replace this with real preference-based generation
+  // once that logic is implemented.
+  static const List<Map<String, dynamic>> _defaultTasks = [
     {
-      'title': 'Review recent login activity',
-      'subtitle': 'Check whether recent sign in activity looks normal.',
-      'reward': 13,
+      'id': 't1',
+      'name': 'Review recent login activity',
+      'description': 'Check whether recent sign in activity looks normal.',
+      'points': 13,
     },
     {
-      'title': 'Review privacy settings',
-      'subtitle': 'Check privacy permissions on your main account.',
-      'reward': 10,
+      'id': 't2',
+      'name': 'Review privacy settings',
+      'description': 'Check privacy permissions on your main account.',
+      'points': 10,
     },
     {
-      'title': 'Change an old password',
-      'subtitle': 'Update one password that has not been changed recently.',
-      'reward': 10,
+      'id': 't3',
+      'name': 'Change an old password',
+      'description': 'Update one password that has not been changed recently.',
+      'points': 10,
     },
   ];
 
@@ -45,12 +50,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadProfile();
   }
 
+  // Loads the profile from Firestore. Seeds demo tasks first if none exist,
+  // so the Complete/Skip buttons always have real data to act on.
   Future<void> _loadProfile() async {
+    setState(() => _loading = true);
+
+    await _authService.seedTasksIfEmpty(_defaultTasks);
+
     final data = await _authService.getProfile();
     setState(() {
       _profile = data;
       _loading = false;
     });
+  }
+
+  // Marks a task as completed and refreshes the dashboard state
+  Future<void> _completeTask(Map<String, dynamic> task) async {
+    final points = (task['points'] as num?)?.toInt() ?? 0;
+    await _authService.completeTask(task['id'] as String, points);
+    await _loadProfile();
+  }
+
+  // Marks a task as skipped and refreshes the dashboard state
+  Future<void> _skipTask(Map<String, dynamic> task) async {
+    await _authService.skipTask(task['id'] as String);
+    await _loadProfile();
   }
 
   Future<void> _logout() async {
@@ -77,7 +101,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final streak = _profile?['current_streak'] ?? 0;
     final points = _profile?['total_points'] ?? 0;
     final level = _profile?['current_level'] ?? 1;
-    final done = _profile?['completed_today'] ?? 0;
+
+    // "Done" is derived from today_tasks rather than stored separately
+    final List todayTasks = _profile?['today_tasks'] ?? [];
+    final done = todayTasks.where((t) => t['status'] == 'completed').length;
 
     return Scaffold(
       backgroundColor: bg,
@@ -93,8 +120,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 28),
               _tasksHeader(),
               const SizedBox(height: 14),
-              for (final t in _tasks) ...[
-                _taskCard(t),
+              for (final t in todayTasks) ...[
+                _taskCard(Map<String, dynamic>.from(t)),
                 const SizedBox(height: 16),
               ],
               const SizedBox(height: 8),
@@ -234,6 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: Colors.black,
           ),
         ),
+        // "New Set" button will be wired to generateNewTaskSet() in a later step
         Text(
           'New Set',
           style: TextStyle(
@@ -247,6 +275,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _taskCard(Map<String, dynamic> t) {
+    final status = t['status'] as String? ?? 'pending';
+    final isPending = status == 'pending';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -258,7 +289,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            t['title'] as String,
+            t['name'] as String? ?? '',
             style: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -267,29 +298,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            t['subtitle'] as String,
+            t['description'] as String? ?? '',
             style: const TextStyle(fontSize: 14, color: Colors.black54),
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _pillButton(
-                  label: 'Complete (+${t['reward']})',
-                  color: darkBtn,
-                  onTap: () {},
+          // Show action buttons only while the task is still pending.
+          // Once completed or skipped, show a status label instead.
+          if (isPending)
+            Row(
+              children: [
+                Expanded(
+                  child: _pillButton(
+                    label: 'Complete (+${t['points']})',
+                    color: darkBtn,
+                    onTap: () => _completeTask(t),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _pillButton(
-                  label: 'Skip',
-                  color: skipBtn,
-                  onTap: () {},
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _pillButton(
+                    label: 'Skip',
+                    color: skipBtn,
+                    onTap: () => _skipTask(t),
+                  ),
                 ),
+              ],
+            )
+          else
+            Text(
+              status == 'completed' ? 'Completed' : 'Skipped',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: status == 'completed' ? mint : Colors.black45,
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );
