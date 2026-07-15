@@ -42,7 +42,7 @@ class AuthService {
       'created_at': FieldValue.serverTimestamp(),
 
       // Streak/task tracking fields
-      'last_active_date': today,
+      'last_active_date': null,
       'today_tasks': [],
       'last_task_generation_date': today,
     });
@@ -72,11 +72,39 @@ class AuthService {
     return data;
   }
 
-  // Complete a task: mark it completed, add points, recalculate level.
-  // Uses a transaction so concurrent writes don't corrupt the task list.
+  // Check streak status when the app opens. If the user missed a full
+  // day (didn't complete any task yesterday), reset the streak to 0.
+  // If they were active yesterday, leave the streak as is — it will
+  // be incremented by completeTask() once they complete a task today.
+  Future<void> checkAndUpdateStreak() async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    final snap = await docRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final lastActive = data['last_active_date'] as String?;
+    if (lastActive == null || lastActive == today) return;
+
+    final yesterday = DateTime.now()
+        .subtract(const Duration(days: 1))
+        .toIso8601String()
+        .substring(0, 10);
+
+    if (lastActive != yesterday) {
+      // Missed at least one full day -> reset streak
+      await docRef.update({'current_streak': 0});
+    }
+  }
+
+  // Complete a task: mark it completed, add points, recalculate level,
+  // and update streak if this is the first completion of the day.
   Future<void> completeTask(String taskId, int points) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(docRef);
@@ -94,10 +122,30 @@ class AuthService {
       final newPoints = (data['total_points'] ?? 0) + points;
       final newLevel = (newPoints ~/ 100) + 1; // 100 points per level
 
+      // Streak logic: only recalculate once per day, on the first
+      // task completion of that day. last_active_date doubles as the
+      // "streak already counted today" flag.
+      final lastActive = data['last_active_date'] as String?;
+      int streak = (data['current_streak'] ?? 0) as int;
+
+      if (lastActive != today) {
+        if (lastActive != null) {
+          final yesterday = DateTime.now()
+              .subtract(const Duration(days: 1))
+              .toIso8601String()
+              .substring(0, 10);
+          streak = (lastActive == yesterday) ? streak + 1 : 1;
+        } else {
+          streak = 1;
+        }
+      }
+
       tx.update(docRef, {
         'today_tasks': tasks,
         'total_points': newPoints,
         'current_level': newLevel,
+        'current_streak': streak,
+        'last_active_date': today,
       });
     });
   }
