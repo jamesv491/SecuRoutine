@@ -29,6 +29,8 @@ class AuthService {
     required String securityPreference,
   }) async {
     final uid = _auth.currentUser!.uid;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
     await _db.collection('users').doc(uid).set({
       'display_name': displayName,
       'experience_level': experienceLevel,
@@ -38,13 +40,35 @@ class AuthService {
       'total_points': 0,
       'current_level': 1,
       'created_at': FieldValue.serverTimestamp(),
+
+      // Streak/task tracking fields
+      'last_active_date': today,
+      'today_tasks': [],
+      'last_task_generation_date': today,
     });
   }
-  
+
   Future<Map<String, dynamic>?> getProfile() async {
     final uid = _auth.currentUser!.uid;
-    final doc = await _db.collection('users').doc(uid).get();
-    return doc.data();
+    final docRef = _db.collection('users').doc(uid);
+    final doc = await docRef.get();
+    final data = doc.data();
+
+    if (data == null) return null;
+
+    // Backfill for accounts created before these fields existed
+    if (!data.containsKey('today_tasks')) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final patch = {
+        'last_active_date': today,
+        'today_tasks': [],
+        'last_task_generation_date': today,
+      };
+      await docRef.update(patch);
+      data.addAll(patch);
+    }
+
+    return data;
   }
 
   // Sign out
