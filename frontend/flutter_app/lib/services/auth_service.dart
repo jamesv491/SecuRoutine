@@ -71,6 +71,55 @@ class AuthService {
     return data;
   }
 
+  // Complete a task: update status, add points, recalc level
+  Future<void> completeTask(String taskId, int points) async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      final data = snap.data();
+      if (data == null) return;
+
+      final List tasks = List.from(data['today_tasks'] ?? []);
+      final idx = tasks.indexWhere((t) => t['id'] == taskId);
+      if (idx == -1 || tasks[idx]['status'] != 'pending') return;
+
+      tasks[idx] = Map<String, dynamic>.from(tasks[idx]);
+      tasks[idx]['status'] = 'completed';
+
+      final newPoints = (data['total_points'] ?? 0) + points;
+      final newLevel = (newPoints ~/ 100) + 1;
+
+      tx.update(docRef, {
+        'today_tasks': tasks,
+        'total_points': newPoints,
+        'current_level': newLevel,
+      });
+    });
+  }
+
+  // Skip a task: update status only, no points
+  Future<void> skipTask(String taskId) async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      final data = snap.data();
+      if (data == null) return;
+
+      final List tasks = List.from(data['today_tasks'] ?? []);
+      final idx = tasks.indexWhere((t) => t['id'] == taskId);
+      if (idx == -1) return;
+
+      tasks[idx] = Map<String, dynamic>.from(tasks[idx]);
+      tasks[idx]['status'] = 'skipped';
+
+      tx.update(docRef, {'today_tasks': tasks});
+    });
+  }
+
   // Sign out
   Future<void> signOut() => _auth.signOut();
 
