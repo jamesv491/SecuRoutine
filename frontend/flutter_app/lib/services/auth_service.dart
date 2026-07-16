@@ -44,7 +44,8 @@ class AuthService {
       'created_at': FieldValue.serverTimestamp(),
 
       // last_active_date left null on purpose — it should only be set
-      // the first time a task is actually completed, not at account creation
+      // the first time a full day's task set is completed, not at
+      // account creation
       'last_active_date': null,
       'today_tasks': [],
       'last_task_generation_date': today,
@@ -76,9 +77,10 @@ class AuthService {
   }
 
   // Check streak status when the app opens. If the user missed a full
-  // day (didn't complete any task yesterday), reset the streak to 0.
-  // If they were active yesterday, leave the streak as is — it will
-  // be incremented by completeTask() once they complete a task today.
+  // day (last_active_date isn't today or yesterday), reset the streak
+  // to 0. If they were active yesterday, leave the streak as is — it
+  // will be incremented by completeTask() once they complete every
+  // task for today.
   Future<void> checkAndUpdateStreak() async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -102,8 +104,10 @@ class AuthService {
     }
   }
 
-  // Complete a task: mark it completed, add points, recalculate level,
-  // and update streak if this is the first completion of the day.
+  // Complete a task: mark it completed and add points/level immediately.
+  // The streak only increments once every task in today_tasks has been
+  // completed (skipped tasks do not count toward finishing the day),
+  // and only once per day.
   Future<void> completeTask(String taskId, int points) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -125,35 +129,44 @@ class AuthService {
       final newPoints = (data['total_points'] ?? 0) + points;
       final newLevel = (newPoints ~/ 100) + 1; // 100 points per level
 
-      // Streak logic: only recalculate once per day, on the first
-      // task completion of that day. last_active_date doubles as the
-      // "streak already counted today" flag.
-      final lastActive = data['last_active_date'] as String?;
-      int streak = (data['current_streak'] ?? 0) as int;
-
-      if (lastActive != today) {
-        if (lastActive != null) {
-          final yesterday = DateTime.now()
-              .subtract(const Duration(days: 1))
-              .toIso8601String()
-              .substring(0, 10);
-          streak = (lastActive == yesterday) ? streak + 1 : 1;
-        } else {
-          streak = 1;
-        }
-      }
-
-      tx.update(docRef, {
+      final update = <String, dynamic>{
         'today_tasks': tasks,
         'total_points': newPoints,
         'current_level': newLevel,
-        'current_streak': streak,
-        'last_active_date': today,
-      });
+      };
+
+      // Only credit the streak if EVERY task for today is now completed
+      // (none left pending or skipped)
+      final allCompleted = tasks.every((t) => t['status'] == 'completed');
+
+      if (allCompleted) {
+        final lastActive = data['last_active_date'] as String?;
+
+        if (lastActive != today) {
+          int streak = (data['current_streak'] ?? 0) as int;
+
+          if (lastActive != null) {
+            final yesterday = DateTime.now()
+                .subtract(const Duration(days: 1))
+                .toIso8601String()
+                .substring(0, 10);
+            streak = (lastActive == yesterday) ? streak + 1 : 1;
+          } else {
+            streak = 1;
+          }
+
+          update['current_streak'] = streak;
+          update['last_active_date'] = today;
+        }
+      }
+
+      tx.update(docRef, update);
     });
   }
 
-  // Skip a task: mark it skipped, no points awarded.
+  // Skip a task: mark it skipped, no points awarded. Skipping removes
+  // the possibility of completing the full set for today, so it does
+  // not contribute toward the streak.
   Future<void> skipTask(String taskId) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
