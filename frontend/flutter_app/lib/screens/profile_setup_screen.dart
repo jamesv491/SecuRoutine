@@ -127,7 +127,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _experience,
+                  initialValue: _experience,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select experience level'),
                   items: const ['Beginner', 'Intermediate', 'Advanced']
@@ -137,7 +137,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _ageGroup,
+                  initialValue: _ageGroup,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select age group'),
                   items: const ['Youth', 'Adult', 'Senior']
@@ -147,7 +147,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _preference,
+                  initialValue: _preference,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select main security preference'),
                   items: const [
