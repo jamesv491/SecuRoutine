@@ -13,6 +13,7 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _authService = AuthService();
 
@@ -38,18 +39,40 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+      ),
     );
   }
 
+  String? _validateDisplayName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter a display name.';
+    }
+    return null;
+  }
+
   Future<void> _saveProfile() async {
+    setState(() => _message = '');
+
+    // Validate the display name field first
+    final formValid = _formKey.currentState!.validate();
+
+    // Then validate the three dropdowns, which Form.validate() doesn't
+    // cover since they're checked manually below
     if (_experience == null || _ageGroup == null || _preference == null) {
       setState(() => _message = 'Please select all of the options.');
       return;
     }
-    setState(() {
-      _loading = true;
-      _message = '';
-    });
+
+    if (!formValid) return;
+
+    setState(() => _loading = true);
     try {
       await _authService.saveProfile(
         displayName: _nameController.text.trim(),
@@ -78,93 +101,98 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              const Text(
-                'SECUROUTINE',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                  color: mint,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text('Profile Setup',
-                  style: TextStyle(color: Colors.black54)),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _nameController,
-                decoration: _boxDecoration('Display name'),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                value: _experience,
-                decoration: _boxDecoration(''),
-                hint: const Text('Select experience level'),
-                items: const ['Beginner', 'Intermediate', 'Advanced']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _experience = v),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                value: _ageGroup,
-                decoration: _boxDecoration(''),
-                hint: const Text('Select age group'),
-                items: const ['Youth', 'Adult', 'Senior']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _ageGroup = v),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                value: _preference,
-                decoration: _boxDecoration(''),
-                hint: const Text('Select main security preference'),
-                items: const [
-                  'Password Security',
-                  'Two-Factor Authentication',
-                  'Account Monitoring',
-                  'Phishing Awareness'
-                ]
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _preference = v),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: mint,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+          child: Form(
+            key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Text(
+                  'SECUROUTINE',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 4,
+                    color: mint,
                   ),
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text('Save Profile and Generate Tasks',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(_message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.black87)),
-            ],
+                const SizedBox(height: 8),
+                const Text('Profile Setup',
+                    style: TextStyle(color: Colors.black54)),
+                const SizedBox(height: 32),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: _boxDecoration('Display name'),
+                  validator: _validateDisplayName,
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: _experience,
+                  decoration: _boxDecoration(''),
+                  hint: const Text('Select experience level'),
+                  items: const ['Beginner', 'Intermediate', 'Advanced']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _experience = v),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: _ageGroup,
+                  decoration: _boxDecoration(''),
+                  hint: const Text('Select age group'),
+                  items: const ['Youth', 'Adult', 'Senior']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _ageGroup = v),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: _preference,
+                  decoration: _boxDecoration(''),
+                  hint: const Text('Select main security preference'),
+                  items: const [
+                    'Password Security',
+                    'Two-Factor Authentication',
+                    'Account Monitoring',
+                    'Phishing Awareness'
+                  ]
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _preference = v),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: mint,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Save Profile and Generate Tasks',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(_message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black87)),
+              ],
+            ),
           ),
         ),
       ),
