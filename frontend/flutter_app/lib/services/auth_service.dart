@@ -7,6 +7,23 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // Returns today's date as YYYY-MM-DD in UTC. All streak/task-generation
+  // date fields (last_active_date, last_task_generation_date) are compared
+  // using this helper so that a user's local timezone never causes the
+  // streak to reset or advance at the wrong moment relative to another
+  // user's, or relative to what the server considers "today".
+  String _todayUtc() {
+    return DateTime.now().toUtc().toIso8601String().substring(0, 10);
+  }
+
+  String _yesterdayUtc() {
+    return DateTime.now()
+        .toUtc()
+        .subtract(const Duration(days: 1))
+        .toIso8601String()
+        .substring(0, 10);
+  }
+
   // Sign in with email + password
   Future<UserCredential> signIn(String email, String password) {
     return _auth.signInWithEmailAndPassword(
@@ -31,7 +48,6 @@ class AuthService {
     required String securityPreference,
   }) async {
     final uid = _auth.currentUser!.uid;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
 
     await _db.collection('users').doc(uid).set({
       'display_name': displayName,
@@ -48,7 +64,7 @@ class AuthService {
       // account creation
       'last_active_date': null,
       'today_tasks': [],
-      'last_task_generation_date': today,
+      'last_task_generation_date': _todayUtc(),
     });
   }
 
@@ -63,11 +79,10 @@ class AuthService {
 
     // Backfill for accounts created before these fields existed
     if (!data.containsKey('today_tasks')) {
-      final today = DateTime.now().toIso8601String().substring(0, 10);
       final patch = {
         'last_active_date': null,
         'today_tasks': [],
-        'last_task_generation_date': today,
+        'last_task_generation_date': _todayUtc(),
       };
       await docRef.update(patch);
       data.addAll(patch);
@@ -77,9 +92,9 @@ class AuthService {
   }
 
   // Check streak status when the app opens. If the user missed a full
-  // day (last_active_date isn't today or yesterday), reset the streak
-  // to 0. If they were active yesterday, leave the streak as is — it
-  // will be incremented by completeTask() once they complete every
+  // day (last_active_date isn't today or yesterday, in UTC), reset the
+  // streak to 0. If they were active yesterday, leave the streak as is —
+  // it will be incremented by completeTask() once they complete every
   // task for today.
   //
   // Runs inside a transaction so it can't race with completeTask(),
@@ -89,7 +104,7 @@ class AuthService {
   Future<void> checkAndUpdateStreak() async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = _todayUtc();
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(docRef);
@@ -99,13 +114,8 @@ class AuthService {
       final lastActive = data['last_active_date'] as String?;
       if (lastActive == null || lastActive == today) return;
 
-      final yesterday = DateTime.now()
-          .subtract(const Duration(days: 1))
-          .toIso8601String()
-          .substring(0, 10);
-
-      if (lastActive != yesterday) {
-        // Missed at least one full day -> reset streak.
+      if (lastActive != _yesterdayUtc()) {
+        // Missed at least one full UTC day -> reset streak.
         // Re-check current_streak inside the transaction in case
         // completeTask already bumped it since we read `data`.
         final currentStreak = (data['current_streak'] ?? 0) as int;
@@ -119,11 +129,11 @@ class AuthService {
   // Complete a task: mark it completed and add points/level immediately.
   // The streak only increments once every task in today_tasks has been
   // completed (skipped tasks do not count toward finishing the day),
-  // and only once per day.
+  // and only once per UTC day.
   Future<void> completeTask(String taskId, int points) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = _todayUtc();
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(docRef);
@@ -158,11 +168,7 @@ class AuthService {
           int streak = (data['current_streak'] ?? 0) as int;
 
           if (lastActive != null) {
-            final yesterday = DateTime.now()
-                .subtract(const Duration(days: 1))
-                .toIso8601String()
-                .substring(0, 10);
-            streak = (lastActive == yesterday) ? streak + 1 : 1;
+            streak = (lastActive == _yesterdayUtc()) ? streak + 1 : 1;
           } else {
             streak = 1;
           }
@@ -211,7 +217,7 @@ class AuthService {
   Future<void> generateNewTaskSet({int setSize = 3}) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = _todayUtc();
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(docRef);
