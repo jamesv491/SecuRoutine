@@ -81,27 +81,39 @@ class AuthService {
   // to 0. If they were active yesterday, leave the streak as is — it
   // will be incremented by completeTask() once they complete every
   // task for today.
+  //
+  // Runs inside a transaction so it can't race with completeTask(),
+  // which also writes current_streak. Without this, checkAndUpdateStreak
+  // could read a stale streak value, and then overwrite a streak that
+  // completeTask had just incremented moments earlier.
   Future<void> checkAndUpdateStreak() async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
-    final snap = await docRef.get();
-    final data = snap.data();
-    if (data == null) return;
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      final data = snap.data();
+      if (data == null) return;
 
-    final lastActive = data['last_active_date'] as String?;
-    if (lastActive == null || lastActive == today) return;
+      final lastActive = data['last_active_date'] as String?;
+      if (lastActive == null || lastActive == today) return;
 
-    final yesterday = DateTime.now()
-        .subtract(const Duration(days: 1))
-        .toIso8601String()
-        .substring(0, 10);
+      final yesterday = DateTime.now()
+          .subtract(const Duration(days: 1))
+          .toIso8601String()
+          .substring(0, 10);
 
-    if (lastActive != yesterday) {
-      // Missed at least one full day -> reset streak
-      await docRef.update({'current_streak': 0});
-    }
+      if (lastActive != yesterday) {
+        // Missed at least one full day -> reset streak.
+        // Re-check current_streak inside the transaction in case
+        // completeTask already bumped it since we read `data`.
+        final currentStreak = (data['current_streak'] ?? 0) as int;
+        if (currentStreak != 0) {
+          tx.update(docRef, {'current_streak': 0});
+        }
+      }
+    });
   }
 
   // Complete a task: mark it completed and add points/level immediately.
@@ -191,48 +203,56 @@ class AuthService {
   // Guarantees at least one task matches the user's security_preference,
   // the rest are picked at random from the remaining pool to avoid a
   // repeated experience, per the original design report.
+  //
+  // Wrapped in a transaction so the read of security_preference and the
+  // write of today_tasks happen atomically, avoiding a lost update if
+  // this is triggered twice in quick succession (e.g. double-tap on
+  // "New Set").
   Future<void> generateNewTaskSet({int setSize = 3}) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
-    final snap = await docRef.get();
-    final data = snap.data();
-    if (data == null) return;
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      final data = snap.data();
+      if (data == null) return;
 
-    final preference = data['security_preference'] as String?;
-    final random = Random();
+      final preference = data['security_preference'] as String?;
+      final random = Random();
 
-    final matching =
-        taskPool.where((t) => t['category'] == preference).toList()
-          ..shuffle(random);
-    final others =
-        taskPool.where((t) => t['category'] != preference).toList()
-          ..shuffle(random);
+      final matching =
+          taskPool.where((t) => t['category'] == preference).toList()
+            ..shuffle(random);
+      final others =
+          taskPool.where((t) => t['category'] != preference).toList()
+            ..shuffle(random);
 
-    final selected = <Map<String, dynamic>>[];
+      final selected = <Map<String, dynamic>>[];
 
-    // At least one task always matches the user's stated preference
-    if (matching.isNotEmpty) {
-      selected.add(matching.first);
-    }
-
-    for (final t in others) {
-      if (selected.length >= setSize) break;
-      selected.add(t);
-    }
-
-    // Fallback in case the pool doesn't have enough tasks to fill setSize
-    while (selected.length < setSize && selected.length < taskPool.length) {
-      final candidate = taskPool[random.nextInt(taskPool.length)];
-      if (!selected.any((t) => t['id'] == candidate['id'])) {
-        selected.add(candidate);
+      // At least one task always matches the user's stated preference
+      if (matching.isNotEmpty) {
+        selected.add(matching.first);
       }
-    }
 
-    await docRef.update({
-      'today_tasks': selected.map((t) => {...t, 'status': 'pending'}).toList(),
-      'last_task_generation_date': today,
+      for (final t in others) {
+        if (selected.length >= setSize) break;
+        selected.add(t);
+      }
+
+      // Fallback in case the pool doesn't have enough tasks to fill setSize
+      while (selected.length < setSize && selected.length < taskPool.length) {
+        final candidate = taskPool[random.nextInt(taskPool.length)];
+        if (!selected.any((t) => t['id'] == candidate['id'])) {
+          selected.add(candidate);
+        }
+      }
+
+      tx.update(docRef, {
+        'today_tasks':
+            selected.map((t) => {...t, 'status': 'pending'}).toList(),
+        'last_task_generation_date': today,
+      });
     });
   }
 
