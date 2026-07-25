@@ -128,7 +128,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: _bottomNav(),
+      // NOTE: bottomNavigationBar removed from here — MainShell now owns
+      // the nav bar and swaps tabs via IndexedStack. Keeping a second
+      // nav bar here would duplicate it when DashboardScreen is nested
+      // inside MainShell.
     );
   }
 
@@ -358,26 +361,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  // ---------- BOTTOM NAV ----------
-  Widget _bottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: bg,
-        border: Border(top: BorderSide(color: Color(0xFFDDD7D0))),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: const [
-          Icon(Icons.home, color: Color(0xFFE07A5A), size: 28),
-          Icon(Icons.notifications, color: Color(0xFFF5B342), size: 28),
-          Icon(Icons.assignment, color: Color(0xFFE08A5A), size: 28),
-          Icon(Icons.settings, color: Color(0xFF9AA0D8), size: 28),
-        ],
       ),
     );
   }
