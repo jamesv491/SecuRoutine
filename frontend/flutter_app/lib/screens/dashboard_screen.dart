@@ -33,7 +33,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // just stayed there showing "Completed" until the user manually
   // tapped "New Set"). Falls back to generating a set for brand-new
   // profiles that don't have one yet.
+  //
+  // Guards each setState with a mounted check, since this runs several
+  // awaits deep (Firestore reads/writes) and the widget can be disposed
+  // mid-flight — e.g. if the app hot-restarts or the user navigates away
+  // while a call is still in progress. Without this, the completed
+  // Future would try to setState() on a State object that's no longer
+  // in the tree and throw.
   Future<void> _loadProfile() async {
+    if (!mounted) return;
     setState(() => _loading = true);
 
     await _authService.checkAndUpdateStreak();
@@ -46,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       data = await _authService.getProfile();
     }
 
+    if (!mounted) return;
     setState(() {
       _profile = data;
       _loading = false;

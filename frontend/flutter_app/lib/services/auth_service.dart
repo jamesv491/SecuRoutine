@@ -205,10 +205,16 @@ class AuthService {
     });
   }
 
-  // Generates a new set of daily tasks from the local task pool.
-  // Guarantees at least one task matches the user's security_preference,
-  // the rest are picked at random from the remaining pool to avoid a
-  // repeated experience, per the original design report.
+  // Generates a new set of daily tasks from the task pool (loaded from
+  // assets/data/task_pool.json). Guarantees at least one task matches
+  // the user's security_preference, the rest are picked at random from
+  // the remaining pool to avoid a repeated experience, per the original
+  // design report.
+  //
+  // The pool is loaded once (and cached by loadTaskPool()) before the
+  // transaction starts, since asset reads are async and Firestore
+  // transactions should only contain the read/write logic they need to
+  // run atomically.
   //
   // Wrapped in a transaction so the read of security_preference and the
   // write of today_tasks happen atomically, avoiding a lost update if
@@ -219,6 +225,7 @@ class AuthService {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
     final today = _todayUtc();
+    final pool = await loadTaskPool();
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(docRef);
@@ -229,10 +236,10 @@ class AuthService {
       final random = Random();
 
       final matching =
-          taskPool.where((t) => t['category'] == preference).toList()
+          pool.where((t) => t['category'] == preference).toList()
             ..shuffle(random);
       final others =
-          taskPool.where((t) => t['category'] != preference).toList()
+          pool.where((t) => t['category'] != preference).toList()
             ..shuffle(random);
 
       final selected = <Map<String, dynamic>>[];
@@ -248,8 +255,8 @@ class AuthService {
       }
 
       // Fallback in case the pool doesn't have enough tasks to fill setSize
-      while (selected.length < setSize && selected.length < taskPool.length) {
-        final candidate = taskPool[random.nextInt(taskPool.length)];
+      while (selected.length < setSize && selected.length < pool.length) {
+        final candidate = pool[random.nextInt(pool.length)];
         if (!selected.any((t) => t['id'] == candidate['id'])) {
           selected.add(candidate);
         }
