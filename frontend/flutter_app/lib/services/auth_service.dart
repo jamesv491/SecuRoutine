@@ -213,7 +213,8 @@ class AuthService {
   // Wrapped in a transaction so the read of security_preference and the
   // write of today_tasks happen atomically, avoiding a lost update if
   // this is triggered twice in quick succession (e.g. double-tap on
-  // "New Set").
+  // "New Set"). Called both manually (New Set button) and automatically
+  // by refreshTaskSetForNewDay() below.
   Future<void> generateNewTaskSet({int setSize = 3}) async {
     final uid = _auth.currentUser!.uid;
     final docRef = _db.collection('users').doc(uid);
@@ -260,6 +261,34 @@ class AuthService {
         'last_task_generation_date': today,
       });
     });
+  }
+
+  // Regenerates today_tasks if the stored set is from a previous UTC day.
+  //
+  // Fixes bugs 010/011/012: the dashboard used to decide whether to call
+  // generateNewTaskSet() based on whether today_tasks was EMPTY. But a
+  // finished set from yesterday still has 3 items in it (their status is
+  // just 'completed'/'skipped'), so that check was never true on a normal
+  // day -> the old set just kept showing "Completed" forever, and because
+  // generateNewTaskSet() was never called, last_task_generation_date
+  // (and, in turn, last_active_date/streak via completeTask) never got
+  // updated either.
+  //
+  // This checks the actual date instead of the array length. Call this
+  // every time the dashboard loads, right after checkAndUpdateStreak().
+  Future<void> refreshTaskSetForNewDay({int setSize = 3}) async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+    final today = _todayUtc();
+
+    final snap = await docRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final lastGenerated = data['last_task_generation_date'] as String?;
+    if (lastGenerated == today) return; // already have today's set
+
+    await generateNewTaskSet(setSize: setSize);
   }
 
   // Sign out

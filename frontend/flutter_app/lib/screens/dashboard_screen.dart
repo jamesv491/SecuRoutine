@@ -27,22 +27,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // Loads the profile from Firestore. Checks/resets streak first, then
-  // generates a task set from the pool if today_tasks is empty, so the
-  // Complete/Skip buttons always have real data to act on.
+  // regenerates today_tasks if the stored set is from a previous day
+  // (fixes bugs 010/011/012 — previously this only regenerated when
+  // today_tasks was literally empty, so a finished set from yesterday
+  // just stayed there showing "Completed" until the user manually
+  // tapped "New Set"). Falls back to generating a set for brand-new
+  // profiles that don't have one yet.
   Future<void> _loadProfile() async {
     setState(() => _loading = true);
 
     await _authService.checkAndUpdateStreak();
+    await _authService.refreshTaskSetForNewDay();
 
-    final data = await _authService.getProfile();
+    var data = await _authService.getProfile();
     final List existingTasks = data?['today_tasks'] ?? [];
     if (existingTasks.isEmpty) {
       await _authService.generateNewTaskSet();
+      data = await _authService.getProfile();
     }
 
-    final refreshed = await _authService.getProfile();
     setState(() {
-      _profile = refreshed;
+      _profile = data;
       _loading = false;
     });
   }
