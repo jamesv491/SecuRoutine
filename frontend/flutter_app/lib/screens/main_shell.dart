@@ -69,7 +69,7 @@ class _MainShellState extends State<MainShell> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Icon(
                 icon,
-                color: isSelected ? color : color.withOpacity(0.35),
+                color: isSelected ? color : color.withValues(alpha: 0.35),
                 size: isSelected ? 30 : 28,
               ),
             ),

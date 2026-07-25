@@ -6,6 +6,7 @@ import 'main_shell.dart';
 
 const mint = Color(0xFF7DD3C0);
 const mintLight = Color(0xFFE0F5EF);
+const bgColor = Color(0xFFF2EEEC);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -80,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  InputDecoration _boxDecoration(String hint) {
+  InputDecoration _boxDecoration(String hint, {Widget? suffix}) {
     return InputDecoration(
       hintText: hint,
       filled: true,
@@ -98,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: Colors.redAccent, width: 2),
       ),
+      suffixIcon: suffix,
     );
   }
 
@@ -168,6 +170,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _message = _friendlyError(e));
+    } catch (e) {
+      setState(() => _message = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -176,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2EEEC),
+      backgroundColor: bgColor,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
