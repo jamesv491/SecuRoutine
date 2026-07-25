@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import 'profile_setup_screen.dart';
-import 'dashboard_screen.dart';
+import 'main_shell.dart';
 
 const mint = Color(0xFF7DD3C0);
 const mintLight = Color(0xFFE0F5EF);
@@ -156,10 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailController.text,
           _passwordController.text,
         );
+        // Go to MainShell (not DashboardScreen directly) so the bottom
+        // nav bar is present after a fresh login, same as when the app
+        // is reopened with an existing session via AuthGate.
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            MaterialPageRoute(builder: (_) => const MainShell()),
           );
         }
       }

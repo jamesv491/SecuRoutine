@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart'; // to reuse the mint color
-import 'dashboard_screen.dart';
+import 'main_shell.dart';
 
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -80,10 +80,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ageGroup: _ageGroup!,
         securityPreference: _preference!,
       );
+      // Go to MainShell (not DashboardScreen directly) so a freshly
+      // registered user lands on the tabbed shell with the bottom nav
+      // bar, same as returning users via AuthGate or login.
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          MaterialPageRoute(builder: (_) => const MainShell()),
           (route) => false,
         );
       }
