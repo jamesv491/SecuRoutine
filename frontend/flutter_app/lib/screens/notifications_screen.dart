@@ -35,7 +35,7 @@ class NotificationsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         Expanded(child: ListView.separated(itemCount: notifications.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {final n = notifications[index];
         return Container(
           padding: const EdgeInsets.all(16),

@@ -59,7 +59,7 @@ class _TasksScreenState extends State<TasksScreen> {
             Expanded(
               child: todayTasks.isEmpty ? const Center(child: Text('No tasks yet')) : ListView.separated(
                     itemCount: todayTasks.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final t = Map<String, dynamic>.from(todayTasks[index]);
                       final status = t['status'] ?? 'pending';

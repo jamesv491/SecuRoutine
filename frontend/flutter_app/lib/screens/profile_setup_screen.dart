@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'login_screen.dart'; // to reuse the mint color
 import 'main_shell.dart';
 
+const mint = Color(0xFF7DD3C0);
+const bgColor = Color(0xFFF2EEEC);
 
 class ProfileSetupScreen extends StatefulWidget {
   final String displayName;
@@ -43,26 +44,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-      ),
     );
   }
 
-  String? _validateDisplayName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Please enter a display name.';
-    }
-    return null;
-  }
 
   Future<void> _saveProfile() async {
     setState(() => _message = '');
-
     // Validate the display name field first
-    final formValid = _formKey.currentState!.validate();
-
     // Then validate the three dropdowns, which Form.validate() doesn't
     // cover since they're checked manually below
     if (_experience == null || _ageGroup == null || _preference == null) {
@@ -70,7 +58,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    if (!formValid) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
     try {
@@ -96,41 +84,40 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
+@override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2EEEC),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Form(
-            key: _formKey,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  'SECUROUTINE',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    color: mint,
+    return Scaffold(backgroundColor: bgColor, body: Center(
+      child: SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+          child: Form(key: _formKey, child: Column(
+            children: [
+              const SizedBox(height: 40),
+              const Text( 'SECUROUTINE',
+                style: TextStyle(fontSize: 30,fontWeight: FontWeight.bold, letterSpacing: 4,color: mint,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text('Profile Setup',
-                    style: TextStyle(color: Colors.black54)),
-                const SizedBox(height: 32),
-                TextFormField(
-                  controller: _nameController,
+              const SizedBox(height: 8),
+              const Text('Profile Setup',
+                style: TextStyle(color: Colors.black54),
+                ),
+              const SizedBox(height: 32),
+              TextFormField(controller: _nameController,
                   decoration: _boxDecoration('Display name'),
-                  validator: _validateDisplayName,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a display name.';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _experience,
+                DropdownButtonFormField<String>(initialValue: _experience,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select experience level'),
                   items: const ['Beginner', 'Intermediate', 'Advanced']
@@ -139,8 +126,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   onChanged: (v) => setState(() => _experience = v),
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _ageGroup,
+                DropdownButtonFormField<String>(initialValue: _ageGroup,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select age group'),
                   items: const ['Youth', 'Adult', 'Senior']
@@ -149,8 +135,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   onChanged: (v) => setState(() => _ageGroup = v),
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _preference,
+                DropdownButtonFormField<String>(initialValue: _preference,
                   decoration: _boxDecoration(''),
                   hint: const Text('Select main security preference'),
                   items: const [
@@ -158,42 +143,34 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     'Two-Factor Authentication',
                     'Account Monitoring',
                     'Phishing Awareness'
-                  ]
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
+                  ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                   onChanged: (v) => setState(() => _preference = v),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _loading ? null : _saveProfile,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: mint,
-                      foregroundColor: Colors.white,
+                const SizedBox(height: 24),
+                SizedBox(width: double.infinity,
+                  child: ElevatedButton(onPressed: _loading ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(backgroundColor: mint, foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: _loading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                        ? const SizedBox(height: 20, width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2,
                             ),
                           )
-                        : const Text('Save Profile and Generate Tasks',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 15)),
+                        : const Text(
+                            'Save Profile and Generate Tasks',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(_message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.black87)),
+                if (_message.isNotEmpty)
+                  Text(_message, textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
               ],
             ),
           ),
