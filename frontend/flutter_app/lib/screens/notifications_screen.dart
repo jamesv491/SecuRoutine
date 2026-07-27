@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
@@ -21,13 +22,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // silently (e.g. if a Firestore permission/index error is thrown).
   bool _markingAllRead = false;
 
+  // BUG FIX: because MainShell keeps every tab alive inside an
+  // IndexedStack (built once from a const list), this screen's
+  // initState() only ever runs ONE time for the whole app session —
+  // not every time the user taps into the "Alerts" tab. Previously
+  // checkAndGenerateNotifications() was only called from initState,
+  // so time-sensitive notifications (like the "streak about to reset"
+  // warning, which only qualifies once hourUtc >= 23) would never be
+  // generated if that condition wasn't already true the one time this
+  // ran at app startup — even if the user kept the app open past that
+  // point. A full page reload was the only way to see it.
+  //
+  // Fix: re-run the check on a timer while this screen stays mounted,
+  // so time-based conditions get re-evaluated periodically instead of
+  // just once. The StreamBuilder below is already listening to
+  // Firestore in real time, so as soon as a new notification doc is
+  // written the list updates automatically — no manual refresh needed.
+  Timer? _refreshTimer;
+  static const _refreshInterval = Duration(minutes: 5);
+
   @override
   void initState() {
     super.initState();
-    // Fire-and-forget: recompute today's notifications (task reminder /
-    // streak warning) based on the current profile state every time this
-    // tab is opened. Safe to call repeatedly — see _upsertNotification.
+    // Initial check when the app/tab first builds.
     _authService.checkAndGenerateNotifications();
+
+    // Periodic re-check so time-sensitive notifications (streak
+    // warning near end-of-day) still get generated even if the app
+    // was opened well before the threshold and never reloaded.
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      _authService.checkAndGenerateNotifications();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _handleMarkAllRead() async {
