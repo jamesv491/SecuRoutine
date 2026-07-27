@@ -12,8 +12,14 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   static const Color bg = Color(0xFFF2EEEC);
   static const Color accent = Color(0xFFF5B342);
+  static const Color readColor = Color(0xFF4CAF50); // green for read state
 
   final AuthService _authService = AuthService();
+
+  // Tracks the in-flight "Mark all read" request so we can show a small
+  // loading state on the button and surface errors instead of failing
+  // silently (e.g. if a Firestore permission/index error is thrown).
+  bool _markingAllRead = false;
 
   @override
   void initState() {
@@ -22,6 +28,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // streak warning) based on the current profile state every time this
     // tab is opened. Safe to call repeatedly — see _upsertNotification.
     _authService.checkAndGenerateNotifications();
+  }
+
+  Future<void> _handleMarkAllRead() async {
+    if (_markingAllRead) return;
+    setState(() => _markingAllRead = true);
+    try {
+      await _authService.markAllNotificationsRead();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not mark all as read: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _markingAllRead = false);
+    }
   }
 
   IconData _iconFor(String type) {
@@ -74,11 +96,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
                     ),
                     TextButton(
-                      onPressed: () => _authService.markAllNotificationsRead(),
-                      child: const Text(
-                        'Mark all read',
-                        style: TextStyle(fontSize: 13, color: Colors.black54),
-                      ),
+                      onPressed: _markingAllRead ? null : _handleMarkAllRead,
+                      child: _markingAllRead
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Mark all read',
+                              style: TextStyle(fontSize: 13, color: Colors.black54),
+                            ),
                     ),
                   ],
                 ),
@@ -126,6 +154,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         time: _timeAgo(data['created_at'] as Timestamp?),
                         unread: unread,
                         accent: accent,
+                        readColor: readColor,
                         onTap: () {
                           if (unread) {
                             _authService.markNotificationRead(doc.id);
@@ -151,6 +180,7 @@ class _NotificationTile extends StatelessWidget {
   final String time;
   final bool unread;
   final Color accent;
+  final Color readColor;
   final VoidCallback onTap;
 
   const _NotificationTile({
@@ -161,11 +191,17 @@ class _NotificationTile extends StatelessWidget {
     required this.time,
     required this.unread,
     required this.accent,
+    required this.readColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Border + status indicator now have three visually distinct states:
+    // unread -> orange, read -> green. (There is no "neutral" state
+    // anymore; every notification is either unread or read.)
+    final borderColor = unread ? accent.withOpacity(0.5) : readColor.withOpacity(0.45);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -174,9 +210,7 @@ class _NotificationTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: unread ? accent.withOpacity(0.5) : Colors.black12,
-          ),
+          border: Border.all(color: borderColor, width: unread ? 1 : 1.2),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,6 +248,12 @@ class _NotificationTile extends StatelessWidget {
                             color: accent,
                             shape: BoxShape.circle,
                           ),
+                        )
+                      else
+                        Icon(
+                          Icons.check_circle,
+                          color: readColor,
+                          size: 16,
                         ),
                     ],
                   ),
