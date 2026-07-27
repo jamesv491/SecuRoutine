@@ -46,36 +46,45 @@ class _MainShellState extends State<MainShell> {
 
   Widget _bottomNav() {
     final items = [
-      (_currentIndex == 0, Icons.home, const Color(0xFFE07A5A)),
-      (_currentIndex == 1, Icons.notifications, const Color(0xFFF5B342)),
-      (_currentIndex == 2, Icons.assignment, const Color(0xFFE08A5A)),
-      (_currentIndex == 3, Icons.settings, const Color(0xFF9AA0D8)),
+      (Icons.home, 'Home', const Color(0xFFE07A5A)),
+      (Icons.notifications, 'Alerts', const Color(0xFFF5B342)),
+      (Icons.assignment, 'Tasks', const Color(0xFFE08A5A)),
+      (Icons.settings, 'Settings', const Color(0xFF9AA0D8)),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: bg,
-        border: Border(top: BorderSide(color: Color(0xFFDDD7D0))),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(items.length, (index) {
-          final (isSelected, icon, color) = items[index];
-          return GestureDetector(
-            onTap: () => _onTabTap(index),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Icon(
-                icon,
-                color: isSelected ? color : color.withOpacity(0.35),
-                size: isSelected ? 30 : 28,
-              ),
+  return Container(
+    decoration: const BoxDecoration(color: bg,
+      border: Border(top: BorderSide(color: Color(0xFFDDD7D0))),
+    ),
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: List.generate(items.length, (index) {
+        final (icon, label, color) = items[index];
+        final isSelected = _currentIndex == index;
+
+      return GestureDetector(
+        onTap: () => _onTabTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Column(mainAxisSize: MainAxisSize.min,
+          children: [
+          Icon(
+            icon, color: isSelected ? color : color.withValues(alpha: 0.35), size: isSelected ? 28 : 26,
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? color : Colors.black38,
             ),
-          );
-        }),
-      ),
-    );
-  }
+          ),
+            ],
+          ),
+        ),
+      );
+    }),
+  ),
+  );
+}
 }
