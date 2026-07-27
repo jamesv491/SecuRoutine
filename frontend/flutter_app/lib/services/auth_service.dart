@@ -298,6 +298,121 @@ class AuthService {
     await generateNewTaskSet(setSize: setSize);
   }
 
+  // --- Notifications ---
+  //
+  // Notifications are generated client-side, from data that already
+  // exists on the profile (today_tasks, last_task_generation_date) —
+  // there is no separate backend job. Each notification is written to
+  // Firestore at users/{uid}/notifications/{notifId} so it can be
+  // listed and marked as read, but the notifId is deterministic
+  // ("task_reminder_2026-07-26"), so calling this multiple times in the
+  // same UTC day never creates duplicates and never resets a
+  // notification the user already read back to unread.
+  //
+  // Call this once whenever the Notifications tab (or Dashboard) opens.
+  Future<void> checkAndGenerateNotifications() async {
+    final uid = _auth.currentUser!.uid;
+    final docRef = _db.collection('users').doc(uid);
+    final today = _todayUtc();
+
+    final snap = await docRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    // Only reason about today's own task set — if it hasn't been
+    // refreshed yet (refreshTaskSetForNewDay hasn't run), the tasks in
+    // memory belong to a previous day and shouldn't drive notifications.
+    final lastGenerated = data['last_task_generation_date'] as String?;
+    if (lastGenerated != today) return;
+
+    final List tasks = List.from(data['today_tasks'] ?? []);
+    if (tasks.isEmpty) return;
+
+    final hasPending = tasks.any((t) => t['status'] == 'pending');
+    if (!hasPending) return; // nothing left to nag about today
+
+    final notifRef = docRef.collection('notifications');
+
+    await _upsertNotification(
+      notifRef,
+      id: 'task_reminder_$today',
+      type: 'task_reminder',
+      title: "Don't forget today's tasks",
+      message: 'You still have security tasks to complete today.',
+      date: today,
+    );
+
+    // Last hour of the UTC day -> streak is at real risk
+    final hourUtc = DateTime.now().toUtc().hour;
+    if (hourUtc >= 23) {
+      await _upsertNotification(
+        notifRef,
+        id: 'streak_warning_$today',
+        type: 'streak_warning',
+        title: 'Your streak is about to reset',
+        message:
+            'Less than an hour left today — finish your tasks to keep your streak.',
+        date: today,
+      );
+    }
+  }
+
+  Future<void> _upsertNotification(
+    CollectionReference<Map<String, dynamic>> notifRef, {
+    required String id,
+    required String type,
+    required String title,
+    required String message,
+    required String date,
+  }) async {
+    final docRef = notifRef.doc(id);
+    final existing = await docRef.get();
+    if (existing.exists) return; // already generated today, keep read state
+
+    await docRef.set({
+      'type': type,
+      'title': title,
+      'message': message,
+      'date': date,
+      'created_at': FieldValue.serverTimestamp(),
+      'read': false,
+    });
+  }
+
+  // Live list of the current user's notifications, newest first.
+  Stream<QuerySnapshot<Map<String, dynamic>>> getNotificationsStream() {
+    final uid = _auth.currentUser!.uid;
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .orderBy('created_at', descending: true)
+        .limit(20)
+        .snapshots();
+  }
+
+  Future<void> markNotificationRead(String notifId) async {
+    final uid = _auth.currentUser!.uid;
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .doc(notifId)
+        .update({'read': true});
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final uid = _auth.currentUser!.uid;
+    final col = _db.collection('users').doc(uid).collection('notifications');
+    final unread = await col.where('read', isEqualTo: false).get();
+
+    final batch = _db.batch();
+    for (final doc in unread.docs) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
+  }
+
   // Sign out
   Future<void> signOut() => _auth.signOut();
 
