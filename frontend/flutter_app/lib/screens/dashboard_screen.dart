@@ -16,6 +16,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ---- Palette ----
   static const Color bg = Color(0xFFF2EEEC);
+  static const Color mint = Color(0xFF3FBF8F);
   static const Color darkBtn = Color(0xFF111111);
   static const Color skipBtn = Color(0xFF9C8C6E);
   static const Color glitchRed = Color(0xFFFF5A5A);
